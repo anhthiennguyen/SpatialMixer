@@ -85,34 +85,48 @@ void CanvasComponent::drawBox (juce::Graphics& g,
                                 bool isDragged, bool isHovered, bool isOwned,
                                 int priority) const
 {
-    // Shadow
-    g.setColour(juce::Colours::black.withAlpha(0.40f));
-    g.fillRoundedRectangle(rect.translated(3, 3), 7.0f);
+    float r = 5.0f;
 
-    // Fill
-    float alpha = isOwned ? (isDragged ? 1.0f : 0.88f) : 0.72f;
-    g.setColour(col.withAlpha(alpha));
-    g.fillRoundedRectangle(rect, 7.0f);
-
-    // Resize handle tints
-    g.setColour(juce::Colours::white.withAlpha(0.15f));
-    g.fillRoundedRectangle(rect.withHeight((float)kHandleZone), 7.0f);
-    g.fillRoundedRectangle(rect.withY(rect.getBottom() - kHandleZone)
-                               .withHeight((float)kHandleZone), 7.0f);
-
-    // White highlight ring for owned track
-    if (isOwned)
+    // ── GLOW / bloom ─────────────────────────────────────────────────────────
     {
-        g.setColour(juce::Colours::white.withAlpha(0.45f));
-        g.drawRoundedRectangle(rect.expanded(1.5f), 8.0f, 1.0f);
+        float baseAlpha = isDragged ? 0.14f : (isHovered ? 0.09f : (isOwned ? 0.06f : 0.0f));
+        if (baseAlpha > 0.0f)
+            for (int i = 4; i >= 1; --i)
+            {
+                g.setColour(col.withAlpha(baseAlpha));
+                g.fillRoundedRectangle(rect.expanded((float)i * 3.5f), r + (float)i * 2.f);
+            }
     }
 
-    // Border
-    g.setColour(isDragged ? juce::Colours::white
-                          : (isHovered ? col.brighter(0.9f) : col.brighter(0.4f)));
-    g.drawRoundedRectangle(rect, 7.0f, isDragged ? 2.5f : 1.5f);
+    // ── FROSTED GLASS FILL ───────────────────────────────────────────────────
+    g.setColour(col.withAlpha(isOwned ? 0.24f : 0.15f));
+    g.fillRoundedRectangle(rect, r);
 
-    // Vertical label
+    // Top-half specular sheen
+    juce::ColourGradient sheen (juce::Colours::white.withAlpha(0.09f), rect.getX(), rect.getY(),
+                                juce::Colours::transparentWhite,       rect.getX(), rect.getCentreY(),
+                                false);
+    g.setGradientFill(sheen);
+    g.fillRoundedRectangle(rect, r);
+
+    // ── RESIZE HANDLE TINTS ──────────────────────────────────────────────────
+    g.setColour(juce::Colours::white.withAlpha(0.09f));
+    g.fillRoundedRectangle(rect.withHeight((float)kHandleZone), r);
+    g.fillRoundedRectangle(rect.withY(rect.getBottom() - (float)kHandleZone)
+                               .withHeight((float)kHandleZone), r);
+
+    // ── BORDER ───────────────────────────────────────────────────────────────
+    float borderAlpha = isDragged ? 1.0f : (isHovered ? 0.90f : (isOwned ? 0.75f : 0.55f));
+    g.setColour(col.withAlpha(borderAlpha));
+    g.drawRoundedRectangle(rect, r, isDragged ? 2.0f : 1.5f);
+
+    if (isOwned)
+    {
+        g.setColour(juce::Colours::white.withAlpha(0.38f));
+        g.drawRoundedRectangle(rect.expanded(1.5f), r + 1.5f, 1.0f);
+    }
+
+    // ── VERTICAL LABEL ───────────────────────────────────────────────────────
     if (rect.getHeight() >= 28.0f)
     {
         g.saveState();
@@ -127,18 +141,17 @@ void CanvasComponent::drawBox (juce::Graphics& g,
 
         float fontSize = juce::jlimit(10.0f, 15.0f, rect.getHeight() * 0.14f);
         g.setFont(juce::Font(juce::FontOptions().withHeight(fontSize).withStyle("Bold")));
-        g.setColour(juce::Colours::white);
+        g.setColour(juce::Colours::white.withAlpha(0.90f));
         g.drawText(label, textRect.toNearestInt(), juce::Justification::centred, true);
         g.restoreState();
     }
 
-    // Priority badge — only shown when track has been yielded (priority > 0)
+    // ── PRIORITY BADGE ────────────────────────────────────────────────────────
     if (priority > 0)
     {
         juce::Rectangle<float> badge (rect.getRight() - 14.0f, rect.getY() - 1.0f, 14.0f, 14.0f);
-        g.setColour(juce::Colours::black.withAlpha(0.8f));
+        g.setColour(juce::Colours::black.withAlpha(0.85f));
         g.fillEllipse(badge);
-        // Colour shifts: priority 1 = amber, 2+ = red
         g.setColour(priority == 1 ? juce::Colour(0xffF9A825) : juce::Colour(0xffE53935));
         g.drawEllipse(badge, 1.0f);
         g.setFont(juce::Font(juce::FontOptions().withHeight(8.5f).withStyle("Bold")));
@@ -150,62 +163,74 @@ void CanvasComponent::drawBox (juce::Graphics& g,
 //==============================================================================
 void CanvasComponent::paint (juce::Graphics& g)
 {
-    const int w = getWidth();
-    const int h = getHeight();
+    const float W = (float)getWidth();
+    const int   w = getWidth();
+    const int   h = getHeight();
 
-    // Band stripes
+    // ── BACKGROUND ───────────────────────────────────────────────────────────
+    g.fillAll(juce::Colour(0xff070b10));
+
+    // Subtle per-band zone tints + 3-px coloured accent bar on the left edge
     for (int b = 0; b < kNumBands; ++b)
     {
         int   db = kNumBands - 1 - b;
         float y0 = (float)(b * h) / kNumBands;
         float y1 = (float)((b + 1) * h) / kNumBands;
-        g.setColour(bandColour(db).withAlpha(0.88f));
-        g.fillRect(juce::Rectangle<float>(0, y0, (float)w, y1 - y0));
-        g.setColour(juce::Colours::white.withAlpha(0.38f));
-        g.setFont(juce::Font(juce::FontOptions().withHeight(10.0f).withStyle("Italic")));
-        g.drawText(kBands[db].name, w - 58, (int)y0, 56, (int)(y1 - y0),
-                   juce::Justification::centredRight, false);
-        if (b > 0)
-        {
-            g.setColour(juce::Colours::white.withAlpha(0.10f));
-            g.drawHorizontalLine((int)y0, 0.0f, (float)w);
-        }
+        g.setColour(bandColour(db).withAlpha(0.07f));
+        g.fillRect(juce::Rectangle<float>(0.f, y0, W, y1 - y0));
+        g.setColour(bandColour(db).withAlpha(0.55f));
+        g.fillRect(juce::Rectangle<float>(0.f, y0, 3.f, y1 - y0));
     }
 
-    // Centre line
-    g.setColour(juce::Colours::white.withAlpha(0.22f));
-    g.drawVerticalLine(w / 2, 0.0f, (float)(h - 18));
+    // ── BAND SEPARATORS + FREQUENCY LABELS ───────────────────────────────────
+    g.setFont(juce::Font(juce::FontOptions().withHeight(10.0f).withStyle("Italic")));
+    for (int b = 0; b < kNumBands; ++b)
+    {
+        float y = (float)(b * h) / kNumBands;
+        if (b > 0)
+        {
+            g.setColour(juce::Colours::white.withAlpha(0.07f));
+            g.drawHorizontalLine((int)y, 3.f, W);
+        }
+        int   db     = kNumBands - 1 - b;
+        float labelY = y + (float)h / kNumBands * 0.5f;
+        g.setColour(juce::Colours::white.withAlpha(0.28f));
+        g.drawText(juce::String(kBands[db].name) + " · "
+                       + juce::String((int)kBands[db].centerHz) + "Hz",
+                   w - 90, (int)(labelY - 7.f), 88, 14,
+                   juce::Justification::centredRight, false);
+    }
 
-    // Zone labels
-    g.setColour(juce::Colours::white.withAlpha(0.35f));
+    // ── CENTRE LINE + ZONE LABELS ────────────────────────────────────────────
+    g.setColour(juce::Colours::white.withAlpha(0.18f));
+    g.drawVerticalLine(w / 2, 0.f, (float)(h - 18));
+
+    g.setColour(juce::Colours::white.withAlpha(0.30f));
     g.setFont(juce::Font(juce::FontOptions().withHeight(11.0f).withStyle("Bold")));
-    g.drawText("LEFT",  4,        4, w / 2 - 8, 14, juce::Justification::centredLeft);
-    g.drawText("MONO",  w/2 - 24, 4, 48,        14, juce::Justification::centred);
-    g.drawText("RIGHT", w/2 + 4,  4, w / 2 - 8, 14, juce::Justification::centredRight);
+    g.drawText("LEFT",  4,          4, w / 2 - 8, 14, juce::Justification::centredLeft);
+    g.drawText("MONO",  w / 2 - 24, 4, 48,        14, juce::Justification::centred);
+    g.drawText("RIGHT", w / 2 + 4,  4, w / 2 - 8, 14, juce::Justification::centredRight);
 
+    // ── TRACK BOXES ──────────────────────────────────────────────────────────
     auto states  = SharedMixerState::getInstance()->getAllStates();
     int  ownSlot = proc_.getSlotIndex();
 
-    // Draw all boxes (real + mirror) — both fully solid and identical
     for (int i = 0; i < kMaxTracks; ++i)
     {
         if (!states[i].active) continue;
 
-        bool isOwned   = (i == ownSlot);
+        bool isOwned         = (i == ownSlot);
         bool isDraggedReal   = (i == draggedSlot_ && !dragIsMirror_);
         bool isDraggedMirror = (i == draggedSlot_ &&  dragIsMirror_);
         bool isHoveredReal   = (i == hoveredSlot_ && !hoverIsMirror_);
         bool isHoveredMirror = (i == hoveredSlot_ &&  hoverIsMirror_);
 
         juce::Colour col = SharedMixerState::trackColour(i);
+        int          pri = states[i].priority;
 
-        int pri = states[i].priority;
-
-        // Primary box
         drawBox(g, boxRect(states[i]), states[i].label, col,
                 isDraggedReal, isHoveredReal, isOwned, pri);
 
-        // Mirror box — skip if centred or track is in Pan mode (intentional one-side)
         bool centred = std::abs(states[i].normX - 0.5f) < 0.01f;
         bool isPan   = (states[i].mode == TrackState::Mode::Pan);
         if (!centred && !isPan)
@@ -213,28 +238,25 @@ void CanvasComponent::paint (juce::Graphics& g)
                     isDraggedMirror, isHoveredMirror, isOwned, pri);
     }
 
-    // Status bar
-    g.setColour(juce::Colours::black.withAlpha(0.55f));
+    // ── STATUS BAR ───────────────────────────────────────────────────────────
+    g.setColour(juce::Colours::black.withAlpha(0.65f));
     g.fillRect(0, h - 18, w, 18);
-    g.setColour(juce::Colours::white.withAlpha(0.45f));
+    g.setColour(juce::Colours::white.withAlpha(0.40f));
     g.setFont(juce::Font(juce::FontOptions().withHeight(10.0f)));
 
-    const auto& ts = proc_.getTrackState();
-    bool isPanMode = (ts.mode == TrackState::Mode::Pan);
-    juce::String modeStr = isPanMode ? "Pan" : "Stereo";
-    float width = std::abs(ts.normX * 2.0f - 1.0f);
-    juce::String widthStr = isPanMode
-        ? (ts.normX < 0.5f ? "L " : "R ") + juce::String((int)(width * 100)) + "%"
-        : juce::String((int)(width * 100)) + "% wide";
+    const auto&  ts       = proc_.getTrackState();
+    bool         isPanMode = (ts.mode == TrackState::Mode::Pan);
+    float        posWidth  = std::abs(ts.normX * 2.0f - 1.0f);
+    juce::String posStr   = isPanMode
+        ? ((ts.normX < 0.5f ? "L " : "R ") + juce::String((int)(posWidth * 100)) + "%")
+        : (juce::String((int)(posWidth * 100)) + "% wide");
     juce::String bandName = kBands[juce::jlimit(0, kNumBands - 1,
         (int)std::round(ts.getFractionalBand()))].name;
-
     int ownSlotDisplay = ownSlot >= 0 ? ownSlot + 1 : 0;
+
     g.drawText("Slot " + juce::String(ownSlotDisplay) + ": "
-               + ts.label
-               + "   [" + modeStr + "]"
-               + "   " + widthStr
-               + "   Band: " + bandName
+               + ts.label + "   [" + (isPanMode ? "Pan" : "Stereo") + "]"
+               + "   " + posStr + "   Band: " + bandName
                + "   |  drag  |  edges: resize  |  dbl-click: rename  |  right-click: options",
                6, h - 17, w - 12, 16, juce::Justification::centredLeft, false);
 }
