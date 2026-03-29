@@ -82,24 +82,13 @@ void CanvasComponent::drawBox (juce::Graphics& g,
                                 juce::Rectangle<float> rect,
                                 const juce::String& label,
                                 juce::Colour col,
-                                bool isDragged, bool isHovered, bool isOwned,
-                                int priority) const
+                                bool isDragged, bool isHovered, bool isOwned) const
 {
     float r = 5.0f;
 
-    // ── GLOW / bloom ─────────────────────────────────────────────────────────
-    {
-        float baseAlpha = isDragged ? 0.14f : (isHovered ? 0.09f : (isOwned ? 0.06f : 0.0f));
-        if (baseAlpha > 0.0f)
-            for (int i = 4; i >= 1; --i)
-            {
-                g.setColour(col.withAlpha(baseAlpha));
-                g.fillRoundedRectangle(rect.expanded((float)i * 3.5f), r + (float)i * 2.f);
-            }
-    }
-
     // ── FROSTED GLASS FILL ───────────────────────────────────────────────────
-    g.setColour(col.withAlpha(isOwned ? 0.24f : 0.15f));
+    float fillAlpha = isDragged ? 0.45f : (isHovered ? 0.32f : (isOwned ? 0.24f : 0.15f));
+    g.setColour(col.withAlpha(fillAlpha));
     g.fillRoundedRectangle(rect, r);
 
     // Top-half specular sheen
@@ -146,18 +135,6 @@ void CanvasComponent::drawBox (juce::Graphics& g,
         g.restoreState();
     }
 
-    // ── PRIORITY BADGE ────────────────────────────────────────────────────────
-    if (priority > 0)
-    {
-        juce::Rectangle<float> badge (rect.getRight() - 14.0f, rect.getY() - 1.0f, 14.0f, 14.0f);
-        g.setColour(juce::Colours::black.withAlpha(0.85f));
-        g.fillEllipse(badge);
-        g.setColour(priority == 1 ? juce::Colour(0xffF9A825) : juce::Colour(0xffE53935));
-        g.drawEllipse(badge, 1.0f);
-        g.setFont(juce::Font(juce::FontOptions().withHeight(8.5f).withStyle("Bold")));
-        g.setColour(juce::Colours::white);
-        g.drawText(juce::String(priority), badge.toNearestInt(), juce::Justification::centred);
-    }
 }
 
 //==============================================================================
@@ -215,7 +192,17 @@ void CanvasComponent::paint (juce::Graphics& g)
     auto states  = SharedMixerState::getInstance()->getAllStates();
     int  ownSlot = proc_.getSlotIndex();
 
-    for (int i = 0; i < kMaxTracks; ++i)
+    // Paint high-priority-number (yielding) tracks first so low-priority-number
+    // (winning) tracks naturally render on top — no badge needed.
+    std::array<int, kMaxTracks> drawOrder;
+    std::iota(drawOrder.begin(), drawOrder.end(), 0);
+    std::sort(drawOrder.begin(), drawOrder.end(), [&](int a, int b) {
+        int pa = states[a].active ? states[a].priority : -1;
+        int pb = states[b].active ? states[b].priority : -1;
+        return pa > pb;   // higher number → drawn first → visually behind
+    });
+
+    for (int i : drawOrder)
     {
         if (!states[i].active) continue;
 
@@ -226,16 +213,15 @@ void CanvasComponent::paint (juce::Graphics& g)
         bool isHoveredMirror = (i == hoveredSlot_ &&  hoverIsMirror_);
 
         juce::Colour col = SharedMixerState::trackColour(i);
-        int          pri = states[i].priority;
 
         drawBox(g, boxRect(states[i]), states[i].label, col,
-                isDraggedReal, isHoveredReal, isOwned, pri);
+                isDraggedReal, isHoveredReal, isOwned);
 
         bool centred = std::abs(states[i].normX - 0.5f) < 0.01f;
         bool isPan   = (states[i].mode == TrackState::Mode::Pan);
         if (!centred && !isPan)
             drawBox(g, mirrorBoxRect(states[i]), states[i].label, col,
-                    isDraggedMirror, isHoveredMirror, isOwned, pri);
+                    isDraggedMirror, isHoveredMirror, isOwned);
     }
 
     // ── STATUS BAR ───────────────────────────────────────────────────────────

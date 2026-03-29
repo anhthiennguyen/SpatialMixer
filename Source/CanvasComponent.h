@@ -57,8 +57,7 @@ private:
 
     void drawBox (juce::Graphics&, juce::Rectangle<float>,
                   const juce::String& label, juce::Colour col,
-                  bool isDragged, bool isHovered, bool isOwned,
-                  int priority = 0) const;
+                  bool isDragged, bool isHovered, bool isOwned) const;
 
     void timerCallback() override { repaint(); }
 
