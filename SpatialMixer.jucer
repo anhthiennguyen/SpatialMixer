@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<JUCERPROJECT id="a3f8b1c2" name="SpatialMixer" projectType="audioplug" version="1.0.0"
+              bundleIdentifier="com.spatialaudio.spatialmixer" companyName="SpatialAudio"
+              companyWebsite="" companyEmail="" pluginName="SpatialMixer" pluginDesc="Spatial Frequency Mixer"
+              pluginManufacturer="SpatialAudio" pluginManufacturerCode="Spat"
+              pluginCode="Spmx" pluginChannelConfigs="{8, 2}" pluginVST3Category="Fx"
+              pluginAUCategory="kAudioUnitType_Effect" pluginIsSynth="0" pluginWantsMidiInput="0"
+              pluginProducesMidiOut="0" pluginIsMidiEffectPlugin="0" pluginEditorRequiresKeys="0"
+              pluginAUExportPrefix="SpatialMixerAU" aaxIdentifier="com.spatialaudio.spatialmixer"
+              pluginFormats="buildVST3,buildAU" useAppConfig="1" addUsingNamespaceToJuceHeader="1"
+              defines="" cppLanguageStandard="17" juceFolder="/Users/anhthientbd/JUCE"
+              jucerFormatVersion="1">
+  <MAINGROUP id="mgrp0001" name="SpatialMixer">
+    <GROUP id="src0001" name="Source">
+      <FILE id="f000001" name="PluginProcessor.h" compile="0" resource="0"
+            file="Source/PluginProcessor.h"/>
+      <FILE id="f000002" name="PluginProcessor.cpp" compile="1" resource="0"
+            file="Source/PluginProcessor.cpp"/>
+      <FILE id="f000003" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="f000004" name="PluginEditor.cpp" compile="1" resource="0"
+            file="Source/PluginEditor.cpp"/>
+      <FILE id="f000005" name="TrackState.h" compile="0" resource="0" file="Source/TrackState.h"/>
+      <FILE id="f000006" name="TrackState.cpp" compile="1" resource="0" file="Source/TrackState.cpp"/>
+      <FILE id="f000007" name="CanvasComponent.h" compile="0" resource="0"
+            file="Source/CanvasComponent.h"/>
+      <FILE id="f000008" name="CanvasComponent.cpp" compile="1" resource="0"
+            file="Source/CanvasComponent.cpp"/>
+      <FILE id="f000009" name="DSPEngine.h" compile="0" resource="0" file="Source/DSPEngine.h"/>
+      <FILE id="f000010" name="DSPEngine.cpp" compile="1" resource="0" file="Source/DSPEngine.cpp"/>
+      <FILE id="f000011" name="SharedMixerState.h" compile="0" resource="0"
+            file="Source/SharedMixerState.h"/>
+      <FILE id="f000012" name="SharedMixerState.cpp" compile="1" resource="0"
+            file="Source/SharedMixerState.cpp"/>
+    </GROUP>
+  </MAINGROUP>
+  <MODULES>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_plugin_client" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_audio_processors_headless" showAllCode="1" useLocalCopy="0"
+            useGlobalPath="0"/>
+    <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
+  </MODULES>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_WEB_BROWSER="0" JUCE_USE_CURL="0"
+               JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_DISPLAY_SPLASH_SCREEN="0"/>
+  <EXPORTFORMATS>
+    <XCODE_MAC targetFolder="Builds/MacOSX">
+      <CONFIGURATIONS>
+        <CONFIGURATION name="Debug" isDebug="1" optimisation="1" targetName="SpatialMixer"
+                       headerPath="" libraryPath=""/>
+        <CONFIGURATION name="Release" isDebug="0" optimisation="3" targetName="SpatialMixer"
+                       enablePluginBinaryCopyStep="1" vstBinaryLocation="$(HOME)/Library/Audio/Plug-Ins/VST3/"
+                       auBinaryLocation="$(HOME)/Library/Audio/Plug-Ins/Components/"
+                       headerPath="" libraryPath=""/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_basics" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_core" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_data_structures" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_events" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_graphics" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="/Users/anhthientbd/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_processors_headless" path="../../JUCE/modules"/>
+      </MODULEPATHS>
+    </XCODE_MAC>
+  </EXPORTFORMATS>
+</JUCERPROJECT>
