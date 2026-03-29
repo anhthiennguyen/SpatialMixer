@@ -20,12 +20,14 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
 private:
-    SpatialMixerProcessor& proc_;  // the instance this window belongs to
+    SpatialMixerProcessor& proc_;
 
     enum class DragMode { None, Move, ResizeTop, ResizeBottom };
-    DragMode dragMode_    = DragMode::None;
-    int      draggedSlot_ = -1;
-    int      hoveredSlot_ = -1;
+    DragMode dragMode_      = DragMode::None;
+    int      draggedSlot_   = -1;
+    bool     dragIsMirror_  = false;   // true when user grabbed the mirrored box
+    int      hoveredSlot_   = -1;
+    bool     hoverIsMirror_ = false;
 
     float dragStartCentreX_ = 0.0f;
     float dragStartCentreY_ = 0.0f;
@@ -42,14 +44,21 @@ private:
     static constexpr int kHandleZone = 10;
     static constexpr int kMinBoxPx   = 30;
 
-    juce::Rectangle<float> boxRect  (const TrackState& s) const;
-    DragMode                hitZone (const TrackState& s, juce::Point<float> pt) const;
-    int                     hitTest (const std::array<TrackState, kMaxTracks>& states,
-                                     juce::Point<float> pt) const;
+    // Returns the rect for the primary (normX) box
+    juce::Rectangle<float> boxRect       (const TrackState& s) const;
+    // Returns the rect for the mirrored (1-normX) box
+    juce::Rectangle<float> mirrorBoxRect (const TrackState& s) const;
+
+    DragMode hitZone (juce::Rectangle<float> rect, juce::Point<float> pt) const;
+
+    // Returns slot index or -1. Sets isMirrorOut to indicate which box was hit.
+    int hitTest (const std::array<TrackState, kMaxTracks>& states,
+                 juce::Point<float> pt, bool& isMirrorOut) const;
 
     void drawBox (juce::Graphics&, juce::Rectangle<float>,
-                  const juce::String& label, juce::Colour,
-                  bool isDragged, bool isHovered, bool isMirror, bool isOwned) const;
+                  const juce::String& label, juce::Colour col,
+                  bool isDragged, bool isHovered, bool isOwned,
+                  int priority = 0) const;
 
     void timerCallback() override { repaint(); }
 

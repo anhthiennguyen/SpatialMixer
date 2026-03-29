@@ -20,15 +20,21 @@ struct TrackDSPParams
     float eqCenterHz   = 1000.0f;
     float eqBandwidth  = 1.5f;
     float eqGainDb     = 6.0f;
+    float gainDb       = 0.0f;   // priority-based gain reduction (0, -6, -12, ...)
+    bool  isPanMode    = false;  // true = hard mono pan, false = MS stereo widening
 };
 
 struct TrackState
 {
+    enum class Mode { Stereo, Pan };
+
     juce::String label      = "Track";
     float normX             = 0.5f;
     float normY             = 0.5f;
     float normHeight        = 0.25f;
-    bool  active            = false;  // true once a processor registers this slot
+    int   priority          = 0;
+    Mode  mode              = Mode::Stereo;
+    bool  active            = false;
     TrackDSPParams dsp;
 
     float getPan() const { return normX * 2.0f - 1.0f; }
@@ -46,6 +52,7 @@ struct TrackState
 
     void computeDSP()
     {
+        dsp.isPanMode     = (mode == Mode::Pan);
         dsp.panNormalized = getPan();
         float frac  = getFractionalBand();
         int   lo    = juce::jlimit(0, kNumBands - 1, (int)std::floor(frac));

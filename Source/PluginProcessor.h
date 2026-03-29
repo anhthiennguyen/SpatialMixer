@@ -35,6 +35,12 @@ public:
     void setTrackPosition (float normX, float normY);
     void setTrackHeight   (float normHeight);
     void setTrackLabel    (const juce::String& label);
+    void setTrackPriority (int priority);
+    void setTrackMode     (TrackState::Mode mode);
+
+    // Called by SharedMixerState after overlap resolution —
+    // bypasses recompute and pushes final corrected params straight to DSP engine.
+    void applyResolvedDSP (const TrackDSPParams& params);
 
     const TrackState& getTrackState() const { return state_; }
     int getSlotIndex() const { return slotIndex_; }

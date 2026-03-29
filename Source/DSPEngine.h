@@ -20,7 +20,7 @@ public:
     void syncParams();
 
     // Audio thread: process one stereo block in-place.
-    // Sums L+R to mono, applies EQ, then redistributes with pan law.
+    // Uses MS (Mid-Side) widening: X position → stereo width, not hard pan.
     void processBlock (float* L, float* R, int numSamples);
 
     // Safe to call before audio starts (no thread contention yet)
@@ -38,7 +38,11 @@ private:
 
     // Filters (stereo — one per channel)
     juce::dsp::IIR::Filter<float> filterL_, filterR_;
-    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> panSmoother_;
+
+    // widthSmoother_: 0=mono (box at centre), 1=full stereo (box at edge)
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> widthSmoother_;
+    // gainSmoother_: linear gain from priority-based reduction
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> gainSmoother_;
 
     float lastCenterHz_   = -1.0f;
     float lastBandwidth_  = -1.0f;

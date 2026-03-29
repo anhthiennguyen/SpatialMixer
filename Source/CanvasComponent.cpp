@@ -27,29 +27,53 @@ CanvasComponent::~CanvasComponent() { stopTimer(); }
 //==============================================================================
 juce::Rectangle<float> CanvasComponent::boxRect (const TrackState& s) const
 {
-    float cx = s.normX      * (float)getWidth();
-    float cy = s.normY      * (float)getHeight();
+    float cx = s.normX * (float)getWidth();
+    float cy = s.normY * (float)getHeight();
     float h  = juce::jmax(s.normHeight * (float)getHeight(), (float)kMinBoxPx);
     return { cx - kBoxW * 0.5f, cy - h * 0.5f, (float)kBoxW, h };
 }
 
-CanvasComponent::DragMode CanvasComponent::hitZone (const TrackState& s,
+juce::Rectangle<float> CanvasComponent::mirrorBoxRect (const TrackState& s) const
+{
+    float mirrorNX = 1.0f - s.normX;
+    float cx = mirrorNX * (float)getWidth();
+    float cy = s.normY  * (float)getHeight();
+    float h  = juce::jmax(s.normHeight * (float)getHeight(), (float)kMinBoxPx);
+    return { cx - kBoxW * 0.5f, cy - h * 0.5f, (float)kBoxW, h };
+}
+
+CanvasComponent::DragMode CanvasComponent::hitZone (juce::Rectangle<float> rect,
                                                      juce::Point<float> pt) const
 {
-    auto r = boxRect(s);
-    if (!r.contains(pt))                     return DragMode::None;
-    if (pt.y <= r.getY()      + kHandleZone) return DragMode::ResizeTop;
-    if (pt.y >= r.getBottom() - kHandleZone) return DragMode::ResizeBottom;
+    if (!rect.contains(pt))                      return DragMode::None;
+    if (pt.y <= rect.getY()      + kHandleZone)  return DragMode::ResizeTop;
+    if (pt.y >= rect.getBottom() - kHandleZone)  return DragMode::ResizeBottom;
     return DragMode::Move;
 }
 
 int CanvasComponent::hitTest (const std::array<TrackState, kMaxTracks>& states,
-                               juce::Point<float> pt) const
+                               juce::Point<float> pt, bool& isMirrorOut) const
 {
-    // Test top-most (last drawn) first
+    // Test top-most first; check both real and mirror box for each slot
     for (int i = kMaxTracks - 1; i >= 0; --i)
-        if (states[i].active && boxRect(states[i]).contains(pt))
+    {
+        if (!states[i].active) continue;
+
+        // Skip mirror test when centred or in Pan mode (no mirror exists)
+        bool centred = std::abs(states[i].normX - 0.5f) < 0.01f;
+        bool isPan   = (states[i].mode == TrackState::Mode::Pan);
+
+        if (!centred && !isPan && mirrorBoxRect(states[i]).contains(pt))
+        {
+            isMirrorOut = true;
             return i;
+        }
+        if (boxRect(states[i]).contains(pt))
+        {
+            isMirrorOut = false;
+            return i;
+        }
+    }
     return -1;
 }
 
@@ -58,49 +82,35 @@ void CanvasComponent::drawBox (juce::Graphics& g,
                                 juce::Rectangle<float> rect,
                                 const juce::String& label,
                                 juce::Colour col,
-                                bool isDragged, bool isHovered,
-                                bool isMirror, bool isOwned) const
+                                bool isDragged, bool isHovered, bool isOwned,
+                                int priority) const
 {
-    if (isMirror)
+    // Shadow
+    g.setColour(juce::Colours::black.withAlpha(0.40f));
+    g.fillRoundedRectangle(rect.translated(3, 3), 7.0f);
+
+    // Fill
+    float alpha = isOwned ? (isDragged ? 1.0f : 0.88f) : 0.72f;
+    g.setColour(col.withAlpha(alpha));
+    g.fillRoundedRectangle(rect, 7.0f);
+
+    // Resize handle tints
+    g.setColour(juce::Colours::white.withAlpha(0.15f));
+    g.fillRoundedRectangle(rect.withHeight((float)kHandleZone), 7.0f);
+    g.fillRoundedRectangle(rect.withY(rect.getBottom() - kHandleZone)
+                               .withHeight((float)kHandleZone), 7.0f);
+
+    // White highlight ring for owned track
+    if (isOwned)
     {
-        g.setColour(col.withAlpha(0.20f));
-        g.fillRoundedRectangle(rect, 7.0f);
-
-        juce::Path border;
-        border.addRoundedRectangle(rect, 7.0f);
-        const float dash[] = { 5.0f, 4.0f };
-        juce::Path dashed;
-        juce::PathStrokeType(1.5f).createDashedStroke(dashed, border, dash, 2);
-        g.setColour(col.withAlpha(0.45f));
-        g.fillPath(dashed);
+        g.setColour(juce::Colours::white.withAlpha(0.45f));
+        g.drawRoundedRectangle(rect.expanded(1.5f), 8.0f, 1.0f);
     }
-    else
-    {
-        // Shadow
-        g.setColour(juce::Colours::black.withAlpha(0.40f));
-        g.fillRoundedRectangle(rect.translated(3, 3), 7.0f);
 
-        // Fill — owned track slightly brighter
-        float alpha = isOwned ? (isDragged ? 1.0f : 0.88f) : 0.68f;
-        g.setColour(col.withAlpha(alpha));
-        g.fillRoundedRectangle(rect, 7.0f);
-
-        // Handle tints
-        g.setColour(juce::Colours::white.withAlpha(0.15f));
-        g.fillRoundedRectangle(rect.withHeight((float)kHandleZone), 7.0f);
-        g.fillRoundedRectangle(rect.withY(rect.getBottom() - kHandleZone)
-                                   .withHeight((float)kHandleZone), 7.0f);
-
-        // Border — owned track gets a white highlight ring
-        if (isOwned)
-        {
-            g.setColour(juce::Colours::white.withAlpha(0.5f));
-            g.drawRoundedRectangle(rect.expanded(1.5f), 8.0f, 1.0f);
-        }
-        g.setColour(isDragged ? juce::Colours::white
-                              : (isHovered ? col.brighter(0.9f) : col.brighter(0.4f)));
-        g.drawRoundedRectangle(rect, 7.0f, isDragged ? 2.5f : 1.5f);
-    }
+    // Border
+    g.setColour(isDragged ? juce::Colours::white
+                          : (isHovered ? col.brighter(0.9f) : col.brighter(0.4f)));
+    g.drawRoundedRectangle(rect, 7.0f, isDragged ? 2.5f : 1.5f);
 
     // Vertical label
     if (rect.getHeight() >= 28.0f)
@@ -117,9 +127,23 @@ void CanvasComponent::drawBox (juce::Graphics& g,
 
         float fontSize = juce::jlimit(10.0f, 15.0f, rect.getHeight() * 0.14f);
         g.setFont(juce::Font(juce::FontOptions().withHeight(fontSize).withStyle("Bold")));
-        g.setColour(isMirror ? col.brighter(0.4f).withAlpha(0.55f) : juce::Colours::white);
+        g.setColour(juce::Colours::white);
         g.drawText(label, textRect.toNearestInt(), juce::Justification::centred, true);
         g.restoreState();
+    }
+
+    // Priority badge — only shown when track has been yielded (priority > 0)
+    if (priority > 0)
+    {
+        juce::Rectangle<float> badge (rect.getRight() - 14.0f, rect.getY() - 1.0f, 14.0f, 14.0f);
+        g.setColour(juce::Colours::black.withAlpha(0.8f));
+        g.fillEllipse(badge);
+        // Colour shifts: priority 1 = amber, 2+ = red
+        g.setColour(priority == 1 ? juce::Colour(0xffF9A825) : juce::Colour(0xffE53935));
+        g.drawEllipse(badge, 1.0f);
+        g.setFont(juce::Font(juce::FontOptions().withHeight(8.5f).withStyle("Bold")));
+        g.setColour(juce::Colours::white);
+        g.drawText(juce::String(priority), badge.toNearestInt(), juce::Justification::centred);
     }
 }
 
@@ -159,35 +183,34 @@ void CanvasComponent::paint (juce::Graphics& g)
     g.drawText("MONO",  w/2 - 24, 4, 48,        14, juce::Justification::centred);
     g.drawText("RIGHT", w/2 + 4,  4, w / 2 - 8, 14, juce::Justification::centredRight);
 
-    // Fetch all states
     auto states  = SharedMixerState::getInstance()->getAllStates();
     int  ownSlot = proc_.getSlotIndex();
 
-    // Draw mirror ghosts first (all tracks)
+    // Draw all boxes (real + mirror) — both fully solid and identical
     for (int i = 0; i < kMaxTracks; ++i)
     {
         if (!states[i].active) continue;
-        float mirrorNX = 1.0f - states[i].normX;
-        if (std::abs(mirrorNX - states[i].normX) < 0.02f) continue;
 
-        float mirrorCX = mirrorNX * (float)w;
-        float boxH     = juce::jmax(states[i].normHeight * (float)h, (float)kMinBoxPx);
-        float boxY     = states[i].normY * (float)h - boxH * 0.5f;
-        juce::Rectangle<float> mr (mirrorCX - kBoxW * 0.5f, boxY, (float)kBoxW, boxH);
-        drawBox(g, mr, states[i].label, SharedMixerState::trackColour(i),
-                false, false, true, false);
-    }
-
-    // Draw real boxes (all tracks)
-    for (int i = 0; i < kMaxTracks; ++i)
-    {
-        if (!states[i].active) continue;
         bool isOwned   = (i == ownSlot);
-        bool isDragged = (i == draggedSlot_);
-        bool isHovered = (i == hoveredSlot_);
-        drawBox(g, boxRect(states[i]), states[i].label,
-                SharedMixerState::trackColour(i),
-                isDragged, isHovered, false, isOwned);
+        bool isDraggedReal   = (i == draggedSlot_ && !dragIsMirror_);
+        bool isDraggedMirror = (i == draggedSlot_ &&  dragIsMirror_);
+        bool isHoveredReal   = (i == hoveredSlot_ && !hoverIsMirror_);
+        bool isHoveredMirror = (i == hoveredSlot_ &&  hoverIsMirror_);
+
+        juce::Colour col = SharedMixerState::trackColour(i);
+
+        int pri = states[i].priority;
+
+        // Primary box
+        drawBox(g, boxRect(states[i]), states[i].label, col,
+                isDraggedReal, isHoveredReal, isOwned, pri);
+
+        // Mirror box — skip if centred or track is in Pan mode (intentional one-side)
+        bool centred = std::abs(states[i].normX - 0.5f) < 0.01f;
+        bool isPan   = (states[i].mode == TrackState::Mode::Pan);
+        if (!centred && !isPan)
+            drawBox(g, mirrorBoxRect(states[i]), states[i].label, col,
+                    isDraggedMirror, isHoveredMirror, isOwned, pri);
     }
 
     // Status bar
@@ -196,11 +219,24 @@ void CanvasComponent::paint (juce::Graphics& g)
     g.setColour(juce::Colours::white.withAlpha(0.45f));
     g.setFont(juce::Font(juce::FontOptions().withHeight(10.0f)));
 
-    juce::String status = "This track: " + proc_.getTrackState().label;
-    if (ownSlot >= 0)
-        status += "  (slot " + juce::String(ownSlot + 1) + ")";
-    status += "   |   drag any box  |  drag edges to resize  |  double-click to rename";
-    g.drawText(status, 6, h - 17, w - 12, 16, juce::Justification::centredLeft, false);
+    const auto& ts = proc_.getTrackState();
+    bool isPanMode = (ts.mode == TrackState::Mode::Pan);
+    juce::String modeStr = isPanMode ? "Pan" : "Stereo";
+    float width = std::abs(ts.normX * 2.0f - 1.0f);
+    juce::String widthStr = isPanMode
+        ? (ts.normX < 0.5f ? "L " : "R ") + juce::String((int)(width * 100)) + "%"
+        : juce::String((int)(width * 100)) + "% wide";
+    juce::String bandName = kBands[juce::jlimit(0, kNumBands - 1,
+        (int)std::round(ts.getFractionalBand()))].name;
+
+    int ownSlotDisplay = ownSlot >= 0 ? ownSlot + 1 : 0;
+    g.drawText("Slot " + juce::String(ownSlotDisplay) + ": "
+               + ts.label
+               + "   [" + modeStr + "]"
+               + "   " + widthStr
+               + "   Band: " + bandName
+               + "   |  drag  |  edges: resize  |  dbl-click: rename  |  right-click: options",
+               6, h - 17, w - 12, 16, juce::Justification::centredLeft, false);
 }
 
 void CanvasComponent::resized() {}
@@ -210,15 +246,52 @@ void CanvasComponent::mouseDown (const juce::MouseEvent& e)
 {
     if (labelEditor_) { commitEdit(); return; }
 
-    auto states = SharedMixerState::getInstance()->getAllStates();
-    int  idx    = hitTest(states, e.position);
+    auto  states   = SharedMixerState::getInstance()->getAllStates();
+    bool  isMirror = false;
+    int   idx      = hitTest(states, e.position, isMirror);
+
+    // Right-click → priority context menu
+    if (e.mods.isRightButtonDown())
+    {
+        if (idx < 0) return;
+        int currentPriority = states[idx].priority;
+
+        bool isCurrentlyPan = (states[idx].mode == TrackState::Mode::Pan);
+
+        juce::PopupMenu menu;
+        menu.addSectionHeader(states[idx].label);
+        menu.addItem(1, "Bring Forward",  currentPriority > 0);
+        menu.addItem(2, "Send Back");
+        if (currentPriority > 0)
+            menu.addItem(3, "Reset Priority");
+        menu.addSeparator();
+        menu.addItem(4, isCurrentlyPan ? "Switch to Stereo Widening" : "Switch to Pan Mode");
+
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
+            [this, idx, currentPriority, isCurrentlyPan] (int result)
+            {
+                if (result == 1)
+                    SharedMixerState::getInstance()->setPriority(idx, currentPriority - 1);
+                else if (result == 2)
+                    SharedMixerState::getInstance()->setPriority(idx, currentPriority + 1);
+                else if (result == 3)
+                    SharedMixerState::getInstance()->setPriority(idx, 0);
+                else if (result == 4)
+                    SharedMixerState::getInstance()->setMode(
+                        idx, isCurrentlyPan ? TrackState::Mode::Stereo : TrackState::Mode::Pan);
+            });
+        return;
+    }
+
     if (idx < 0) return;
 
-    draggedSlot_ = idx;
-    dragMode_    = hitZone(states[idx], e.position);
+    draggedSlot_  = idx;
+    dragIsMirror_ = isMirror;
     dragStartMouse_ = e.position;
 
-    auto r = boxRect(states[idx]);
+    // Use whichever box was grabbed to seed drag start coords
+    auto r = isMirror ? mirrorBoxRect(states[idx]) : boxRect(states[idx]);
+    dragMode_         = hitZone(r, e.position);
     dragStartCentreX_ = r.getCentreX();
     dragStartCentreY_ = r.getCentreY();
     dragStartTopY_    = r.getY();
@@ -234,10 +307,19 @@ void CanvasComponent::mouseDrag (const juce::MouseEvent& e)
     const float H = (float)getHeight();
     auto delta = e.position - dragStartMouse_;
 
+    // When dragging the mirror box, X movement is inverted so both boxes
+    // track the mouse naturally from whichever side was grabbed.
+    float xSign = dragIsMirror_ ? -1.0f : 1.0f;
+
     if (dragMode_ == DragMode::Move)
     {
-        float nx = juce::jlimit(kBoxW * 0.5f / W, 1.0f - kBoxW * 0.5f / W,
-                                (dragStartCentreX_ + delta.x) / W);
+        float rawCX = dragStartCentreX_ + delta.x * xSign;
+        float nx = juce::jlimit(kBoxW * 0.5f / W, 1.0f - kBoxW * 0.5f / W, rawCX / W);
+        // In Pan mode the single box can go anywhere; in Stereo mode keep primary
+        // box on the left half so the mirror stays on the right half.
+        bool isPan = (shared->getAllStates()[draggedSlot_].mode == TrackState::Mode::Pan);
+        if (!dragIsMirror_ && !isPan)
+            nx = juce::jlimit(0.0f, 0.5f, nx);
         float ny = juce::jlimit(0.0f, 1.0f, (dragStartCentreY_ + delta.y) / H);
         shared->setPosition(draggedSlot_, nx, ny);
     }
@@ -245,38 +327,42 @@ void CanvasComponent::mouseDrag (const juce::MouseEvent& e)
     {
         float newTop = juce::jlimit(0.0f, dragStartBottomY_ - kMinBoxPx,
                                     dragStartTopY_ + delta.y);
-        shared->setPosition(draggedSlot_,
-            SharedMixerState::getInstance()->getAllStates()[draggedSlot_].normX,
-            (newTop + dragStartBottomY_) * 0.5f / H);
-        shared->setHeight(draggedSlot_, (dragStartBottomY_ - newTop) / H);
+        float nx = shared->getAllStates()[draggedSlot_].normX;
+        shared->setPosition(draggedSlot_, nx, (newTop + dragStartBottomY_) * 0.5f / H);
+        shared->setHeight  (draggedSlot_, (dragStartBottomY_ - newTop) / H);
     }
     else if (dragMode_ == DragMode::ResizeBottom)
     {
         float newBot = juce::jlimit(dragStartTopY_ + kMinBoxPx, H,
                                     dragStartBottomY_ + delta.y);
-        shared->setPosition(draggedSlot_,
-            SharedMixerState::getInstance()->getAllStates()[draggedSlot_].normX,
-            (dragStartTopY_ + newBot) * 0.5f / H);
-        shared->setHeight(draggedSlot_, (newBot - dragStartTopY_) / H);
+        float nx = shared->getAllStates()[draggedSlot_].normX;
+        shared->setPosition(draggedSlot_, nx, (dragStartTopY_ + newBot) * 0.5f / H);
+        shared->setHeight  (draggedSlot_, (newBot - dragStartTopY_) / H);
     }
 }
 
 void CanvasComponent::mouseUp (const juce::MouseEvent&)
 {
-    draggedSlot_ = -1;
-    dragMode_    = DragMode::None;
+    draggedSlot_  = -1;
+    dragIsMirror_ = false;
+    dragMode_     = DragMode::None;
 }
 
 void CanvasComponent::mouseMove (const juce::MouseEvent& e)
 {
-    auto states = SharedMixerState::getInstance()->getAllStates();
-    int  prev   = hoveredSlot_;
-    hoveredSlot_ = hitTest(states, e.position);
-    if (hoveredSlot_ != prev) repaint();
+    auto  states = SharedMixerState::getInstance()->getAllStates();
+    bool  isMirror = false;
+    int   slot  = hitTest(states, e.position, isMirror);
 
-    if (hoveredSlot_ >= 0)
+    bool changed = (slot != hoveredSlot_ || isMirror != hoverIsMirror_);
+    hoveredSlot_   = slot;
+    hoverIsMirror_ = isMirror;
+    if (changed) repaint();
+
+    if (slot >= 0)
     {
-        auto zone = hitZone(states[hoveredSlot_], e.position);
+        auto r    = isMirror ? mirrorBoxRect(states[slot]) : boxRect(states[slot]);
+        auto zone = hitZone(r, e.position);
         if (zone == DragMode::ResizeTop || zone == DragMode::ResizeBottom)
             setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         else
@@ -290,8 +376,9 @@ void CanvasComponent::mouseMove (const juce::MouseEvent& e)
 
 void CanvasComponent::mouseDoubleClick (const juce::MouseEvent& e)
 {
-    auto states = SharedMixerState::getInstance()->getAllStates();
-    int  idx    = hitTest(states, e.position);
+    auto  states = SharedMixerState::getInstance()->getAllStates();
+    bool  isMirror = false;
+    int   idx = hitTest(states, e.position, isMirror);
     if (idx >= 0) startEditing(idx);
 }
 

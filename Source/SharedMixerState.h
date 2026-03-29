@@ -26,6 +26,8 @@ public:
     void setPosition (int slot, float normX, float normY);
     void setHeight   (int slot, float normHeight);
     void setLabel    (int slot, const juce::String& label);
+    void setPriority (int slot, int priority);
+    void setMode     (int slot, TrackState::Mode mode);
 
     // Called by a processor to push its full state (e.g. after setStateInformation)
     void pushState (int slot, const TrackState& state);
@@ -45,4 +47,13 @@ private:
 
     std::array<SlotData, kMaxTracks> slots_;
     mutable juce::CriticalSection    lock_;
+
+    // Called after any position/height change.
+    // Computes base DSP params for all tracks, resolves overlaps,
+    // then pushes corrected params to each processor's DSP engine.
+    // Must be called with lock_ NOT held (it acquires the lock internally).
+    void resolveAndPush();
+
+    // Returns the primary band index for a given normY
+    static int primaryBand (float normY);
 };
