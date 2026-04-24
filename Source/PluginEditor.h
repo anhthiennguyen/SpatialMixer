@@ -2,6 +2,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "CanvasComponent.h"
+#include "SpectrumComponent.h"
 
 class SpatialMixerEditor : public juce::AudioProcessorEditor
 {
@@ -14,7 +15,8 @@ public:
 
 private:
     SpatialMixerProcessor& proc_;
-    CanvasComponent canvas_;
+    CanvasComponent    canvas_;
+    SpectrumComponent  spectrum_;
 
     // Track label editor: double-click a box to rename it
     std::unique_ptr<juce::TextEditor> labelEditor_;

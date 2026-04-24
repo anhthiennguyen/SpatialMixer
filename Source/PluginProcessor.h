@@ -44,6 +44,9 @@ public:
 
     const TrackState& getTrackState() const { return state_; }
     int getSlotIndex() const { return slotIndex_; }
+    double getSampleRate() const { return dsp_.getSampleRate(); }
+    SpectrumAnalyser& getSpectrumAnalyser() { return dsp_.getSpectrumAnalyser(); }
+    StereoScope&      getStereoScope()      { return dsp_.getStereoScope(); }
 
 private:
     TrackState state_;

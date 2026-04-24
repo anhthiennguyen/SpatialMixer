@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "TrackState.h"
+#include "StereoScope.h"
 
 class SpatialMixerProcessor;
 
@@ -59,7 +60,18 @@ private:
                   const juce::String& label, juce::Colour col,
                   bool isDragged, bool isHovered, bool isOwned) const;
 
-    void timerCallback() override { repaint(); }
+    void drawSpreadBar   (juce::Graphics&, const TrackState&,
+                          juce::Colour col, bool isDragged) const;
+
+    void drawGoniometer  (juce::Graphics&,
+                          const std::array<TrackState, kMaxTracks>&) const;
+
+    void timerCallback() override;
+
+    struct ScopeSample { float l, r; };
+    static constexpr int kScopeHistory = 512;
+    std::array<std::array<ScopeSample, kScopeHistory>, kMaxTracks> scopeHistory_{};
+    std::array<int, kMaxTracks> scopeCount_{};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CanvasComponent)
 };

@@ -1,12 +1,15 @@
 #include "PluginEditor.h"
 
+static constexpr int kSpectrumHeight = 140;
+
 SpatialMixerEditor::SpatialMixerEditor (SpatialMixerProcessor& p)
-    : AudioProcessorEditor(&p), proc_(p), canvas_(p)
+    : AudioProcessorEditor(&p), proc_(p), canvas_(p), spectrum_(p)
 {
     addAndMakeVisible(canvas_);
-    setSize(620, 480);
+    addAndMakeVisible(spectrum_);
+    setSize(620, 480 + kSpectrumHeight);
     setResizable(true, true);
-    setResizeLimits(480, 360, 1280, 900);
+    setResizeLimits(480, 360 + kSpectrumHeight, 1280, 900 + kSpectrumHeight);
 }
 
 SpatialMixerEditor::~SpatialMixerEditor() {}
@@ -30,5 +33,8 @@ void SpatialMixerEditor::paint (juce::Graphics& g)
 
 void SpatialMixerEditor::resized()
 {
-    canvas_.setBounds(0, 32, getWidth(), getHeight() - 32);
+    int specH  = kSpectrumHeight;
+    int canvasH = getHeight() - 32 - specH;
+    canvas_.setBounds  (0, 32,          getWidth(), canvasH);
+    spectrum_.setBounds(0, 32 + canvasH, getWidth(), specH);
 }

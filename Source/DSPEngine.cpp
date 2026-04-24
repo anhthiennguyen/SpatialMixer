@@ -17,6 +17,7 @@ void DSPEngine::prepare (double sampleRate, int samplesPerBlock)
     filterL_.reset();
     filterR_.reset();
 
+    spectrumAnalyser_.prepare(sampleRate);
     widthSmoother_.reset(sampleRate, 0.02);
     widthSmoother_.setCurrentAndTargetValue(0.0f);
 
@@ -83,6 +84,8 @@ void DSPEngine::syncParams()
 
 void DSPEngine::processBlock (float* L, float* R, int numSamples)
 {
+    spectrumAnalyser_.pushSamples(L, R, numSamples);
+
     for (int n = 0; n < numSamples; ++n)
     {
         // Apply EQ to both channels independently
@@ -113,6 +116,8 @@ void DSPEngine::processBlock (float* L, float* R, int numSamples)
             R[n] = (M - widenedS) * gain;
         }
     }
+
+    stereoScope_.pushSamples(L, R, numSamples);
 }
 
 void DSPEngine::rebuildFilter (float centerHz, float bandwidthOct, float gainDb)

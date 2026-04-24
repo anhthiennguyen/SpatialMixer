@@ -32,6 +32,14 @@
             file="Source/SharedMixerState.h"/>
       <FILE id="f000012" name="SharedMixerState.cpp" compile="1" resource="0"
             file="Source/SharedMixerState.cpp"/>
+      <FILE id="f000013" name="SpectrumAnalyser.h" compile="0" resource="0"
+            file="Source/SpectrumAnalyser.h"/>
+      <FILE id="f000014" name="SpectrumComponent.h" compile="0" resource="0"
+            file="Source/SpectrumComponent.h"/>
+      <FILE id="f000015" name="SpectrumComponent.cpp" compile="1" resource="0"
+            file="Source/SpectrumComponent.cpp"/>
+      <FILE id="f000016" name="StereoScope.h" compile="0" resource="0"
+            file="Source/StereoScope.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

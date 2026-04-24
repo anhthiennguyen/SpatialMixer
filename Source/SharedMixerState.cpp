@@ -203,6 +203,23 @@ void SharedMixerState::resolveAndPush()
 }
 
 //==============================================================================
+SpectrumAnalyser* SharedMixerState::getSpectrumAnalyser (int slot)
+{
+    if (slot < 0 || slot >= kMaxTracks) return nullptr;
+    juce::ScopedLock lock(lock_);
+    if (!slots_[slot].occupied || slots_[slot].processor == nullptr) return nullptr;
+    return &slots_[slot].processor->getSpectrumAnalyser();
+}
+
+StereoScope* SharedMixerState::getStereoScope (int slot)
+{
+    if (slot < 0 || slot >= kMaxTracks) return nullptr;
+    juce::ScopedLock lock(lock_);
+    if (!slots_[slot].occupied || slots_[slot].processor == nullptr) return nullptr;
+    return &slots_[slot].processor->getStereoScope();
+}
+
+//==============================================================================
 juce::Colour SharedMixerState::trackColour (int slot)
 {
     static const juce::Colour colours[kMaxTracks] = {

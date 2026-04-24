@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 #include "TrackState.h"
+#include "SpectrumAnalyser.h"
+#include "StereoScope.h"
 
 class SpatialMixerProcessor;
 
@@ -31,6 +33,10 @@ public:
 
     // Called by a processor to push its full state (e.g. after setStateInformation)
     void pushState (int slot, const TrackState& state);
+
+    // Returns nullptr if slot is unoccupied (message thread only)
+    SpectrumAnalyser* getSpectrumAnalyser (int slot);
+    StereoScope*      getStereoScope      (int slot);
 
     // Per-slot colours
     static juce::Colour trackColour (int slot);

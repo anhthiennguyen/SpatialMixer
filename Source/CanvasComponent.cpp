@@ -138,6 +138,44 @@ void CanvasComponent::drawBox (juce::Graphics& g,
 }
 
 //==============================================================================
+void CanvasComponent::drawSpreadBar (juce::Graphics& g, const TrackState& state,
+                                      juce::Colour col, bool isDragged) const
+{
+    bool isPan   = (state.mode == TrackState::Mode::Pan);
+    bool centred = std::abs(state.normX - 0.5f) < 0.01f;
+    if (isPan || centred) return;
+
+    float W  = (float)getWidth();
+    float H  = (float)getHeight();
+    float cx = state.normX * W;
+    float mx = (1.0f - state.normX) * W;  // mirror centre X
+    float cy = state.normY * H;
+    float boxH = juce::jmax(state.normHeight * H, (float)kMinBoxPx);
+
+    float barH = juce::jmax(6.0f, boxH * 0.28f);
+    float x1   = juce::jmin(cx, mx);
+    float x2   = juce::jmax(cx, mx);
+
+    juce::Rectangle<float> bar (x1, cy - barH * 0.5f, x2 - x1, barH);
+
+    // Gradient: strong at both ends (where the boxes are), fades toward centre
+    juce::ColourGradient grad (col.withAlpha(isDragged ? 0.40f : 0.26f), x1, cy,
+                               col.withAlpha(isDragged ? 0.40f : 0.26f), x2, cy, false);
+    grad.addColour(0.5, col.withAlpha(0.07f));
+    g.setGradientFill(grad);
+    g.fillRoundedRectangle(bar, barH * 0.5f);
+
+    // Outline
+    g.setColour(col.withAlpha(isDragged ? 0.50f : 0.22f));
+    g.drawRoundedRectangle(bar, barH * 0.5f, 1.0f);
+
+    // Centre-line tick at the stereo midpoint (canvas centre)
+    float tickX = W * 0.5f;
+    g.setColour(col.withAlpha(0.18f));
+    g.drawLine(tickX, cy - barH, tickX, cy + barH, 1.0f);
+}
+
+//==============================================================================
 void CanvasComponent::paint (juce::Graphics& g)
 {
     const float W = (float)getWidth();
@@ -188,8 +226,11 @@ void CanvasComponent::paint (juce::Graphics& g)
     g.drawText("MONO",  w / 2 - 24, 4, 48,        14, juce::Justification::centred);
     g.drawText("RIGHT", w / 2 + 4,  4, w / 2 - 8, 14, juce::Justification::centredRight);
 
-    // ── TRACK BOXES ──────────────────────────────────────────────────────────
+    // ── GONIOMETER / VECTORSCOPE ─────────────────────────────────────────────
     auto states  = SharedMixerState::getInstance()->getAllStates();
+    drawGoniometer(g, states);
+
+    // ── TRACK BOXES ──────────────────────────────────────────────────────────
     int  ownSlot = proc_.getSlotIndex();
 
     // Paint high-priority-number (yielding) tracks first so low-priority-number
@@ -202,6 +243,7 @@ void CanvasComponent::paint (juce::Graphics& g)
         return pa > pb;   // higher number → drawn first → visually behind
     });
 
+    // ── TRACK BOXES ──────────────────────────────────────────────────────────
     for (int i : drawOrder)
     {
         if (!states[i].active) continue;
@@ -248,6 +290,82 @@ void CanvasComponent::paint (juce::Graphics& g)
 }
 
 void CanvasComponent::resized() {}
+
+//==============================================================================
+void CanvasComponent::timerCallback()
+{
+    auto* shared = SharedMixerState::getInstance();
+    auto  states = shared->getAllStates();
+    for (int i = 0; i < kMaxTracks; ++i)
+    {
+        if (!states[i].active) continue;
+        StereoScope* scope = shared->getStereoScope(i);
+        if (!scope) continue;
+
+        std::array<float, StereoScope::kDisplaySize> tmpL{}, tmpR{};
+        int got = scope->pullSamples(tmpL.data(), tmpR.data(), StereoScope::kDisplaySize);
+        if (got <= 0) continue;
+
+        int keep = juce::jmin(kScopeHistory - got, scopeCount_[i]);
+        int shift = scopeCount_[i] - keep;
+        for (int j = 0; j < keep; ++j)
+            scopeHistory_[i][j] = scopeHistory_[i][shift + j];
+        for (int j = 0; j < got; ++j)
+            scopeHistory_[i][keep + j] = { tmpL[j], tmpR[j] };
+        scopeCount_[i] = keep + got;
+    }
+    repaint();
+}
+
+//==============================================================================
+void CanvasComponent::drawGoniometer (juce::Graphics& g,
+                                       const std::array<TrackState, kMaxTracks>& states) const
+{
+    const float W = (float)getWidth();
+    const float H = (float)getHeight();
+    float cx     = W * 0.5f;
+    float cy     = H * 0.5f;
+    float radius = juce::jmin(W, H) * 0.28f;
+
+    // Semi-transparent background circle
+    g.setColour(juce::Colours::black.withAlpha(0.28f));
+    g.fillEllipse(cx - radius, cy - radius, radius * 2.0f, radius * 2.0f);
+
+    // Circle outline + crosshairs
+    g.setColour(juce::Colours::white.withAlpha(0.09f));
+    g.drawEllipse(cx - radius, cy - radius, radius * 2.0f, radius * 2.0f, 0.8f);
+    g.drawLine(cx, cy - radius, cx, cy + radius, 0.5f);  // mono axis (vertical)
+    g.drawLine(cx - radius, cy, cx + radius, cy, 0.5f);
+
+    // Per-track dots
+    const float sq2inv = 1.0f / std::sqrt(2.0f);
+    for (int i = 0; i < kMaxTracks; ++i)
+    {
+        if (!states[i].active || scopeCount_[i] == 0) continue;
+        juce::Colour col = SharedMixerState::trackColour(i);
+        int count = scopeCount_[i];
+        int split = count * 3 / 4;
+
+        auto drawDots = [&](int start, int end, float alpha)
+        {
+            if (start >= end) return;
+            juce::Path p;
+            for (int s = start; s < end; ++s)
+            {
+                float l  = scopeHistory_[i][s].l;
+                float r  = scopeHistory_[i][s].r;
+                float px = cx + (r - l) * sq2inv * radius;
+                float py = cy - (r + l) * sq2inv * radius;
+                p.addEllipse(px - 1.0f, py - 1.0f, 2.0f, 2.0f);
+            }
+            g.setColour(col.withAlpha(alpha));
+            g.fillPath(p);
+        };
+
+        drawDots(0,     split, 0.18f);
+        drawDots(split, count, 0.60f);
+    }
+}
 
 //==============================================================================
 void CanvasComponent::mouseDown (const juce::MouseEvent& e)

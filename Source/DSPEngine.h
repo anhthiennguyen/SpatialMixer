@@ -1,6 +1,8 @@
 #pragma once
 #include <JuceHeader.h>
 #include "TrackState.h"
+#include "SpectrumAnalyser.h"
+#include "StereoScope.h"
 
 // Single-track stereo DSP engine.
 // UI thread writes params via updateParams().
@@ -26,6 +28,10 @@ public:
     // Safe to call before audio starts (no thread contention yet)
     void initParams (const TrackDSPParams& params);
 
+    double getSampleRate() const { return sampleRate_; }
+    SpectrumAnalyser& getSpectrumAnalyser() { return spectrumAnalyser_; }
+    StereoScope&      getStereoScope()      { return stereoScope_; }
+
 private:
     double sampleRate_ = 44100.0;
     int    maxBlockSize_ = 0;
@@ -49,4 +55,7 @@ private:
     float lastEqGainDb_   = -1.0f;
 
     void rebuildFilter (float centerHz, float bandwidthOct, float gainDb);
+
+    SpectrumAnalyser spectrumAnalyser_;
+    StereoScope      stereoScope_;
 };
